@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>CRUD</title>
+        <script src="js/jquery-3.1.1.min.js"></script>
+        <script src="js/bootstrap.min.js"></script>
+        <script src="js/validator.min.js"></script>
+        <script src="js/classes.js"></script>
+        <link rel="stylesheet" href="css/bootstrap.min.css">
+        <link rel="stylesheet" href="css/font-awesome.min.css">
+        <link rel="stylesheet" href="css/animate.min.css">
+        <link rel="stylesheet" href="css/style.css">
+        <script>
+        var db = new Database(),
+            entities; // let's search them just once, please
+
+        $( document ).ready(function() {
+
+            entities = {
+                modal: $("#input"), // input modal
+                prompt: $("#prompt"), // 'Are you sure?' modal
+                name: $("#inputName"), 
+                type: $("#inputType"),
+                thing: null // thing being deleted or edited
+            };
+
+            db.Load(); // get info from cookies, our storage area
+            loadAll();
+
+            $('form').validator().on('submit', function (e) { // validates the user input and blocks if any is missing
+                if (!e.isDefaultPrevented())
+                     save(); // good to go, let's save it
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+        });
+
+        // loop through the database and add all records
+        function loadAll()
+        {
+            var elements = db.GetAll();
+            for(var i = 0;i<elements.length; i++)
+            {
+                var thing = Thing.Cast(elements[i]);
+                addRow(thing);
+            }
+        }
+
+        // render each record in the page
+        function addRow(obj)
+        {
+            var clone = $('<tr class="animated flipInX"><th scope="row">'+obj.id+'</th>'+
+            '<td class="large">'+obj.Name()+'</td>'+
+            '<td class="large">'+obj.Type()+'</td>'+
+            '<td class="tight"><button class="btn btn-sm btn-warning" onclick="requestEdition('+obj.id+')"><i class="fa fa-pencil"></i> Edit</button>'+
+            '<button class="btn btn-sm btn-danger" onclick="requestRemoval('+obj.id+')"><i class="fa fa-trash"></i> Delete</button></td>'+
+            '</td></tr>');
+            clone.appendTo("#data");
+        }
+
+        // search the right row and update its contents
+        function updateRow(id)
+        {
+            $("#data").find("th[scope=row]").each(function( index ) {
+                if ( $(this).text() == id )
+                {
+                    var tr = $(this).parent();
+                    var tds = tr.find("td");
+                    $(tds[0]).html(entities.name.val());
+                    $(tds[1]).html(entities.type.val());
+                    return;
+                }
+            });
+        }
+
+        // search the right row and remove it, nicely
+        function removeRow(id)
+        {
+            $("#data").find("th[scope=row]").each(function( index ) {
+                if ( $(this).text() == id )
+                {
+                    var tr = $(this).parent();
+                    tr.addClass("animated flipOutX");
+                    setTimeout(function()
+                    {
+                        tr.remove();
+                    }, 500);
+                    return;
+                }
+            });
+        }
+
+        // open up the modal form for adding/editing records
+        function showInput()
+        {
+            var name = '', type = '';
+            if (entities.thing !=  null)
+            {
+                name = entities.thing.Name();
+                type = entities.thing.Type();
+            }
+
+            entities.name.val(name);
+            entities.type.val(type);
+            entities.modal.modal().on('shown.bs.modal', function(e) // let's focus name input after opening the dialog
+            {
+                entities.name.focus();
+            });
+        }
+
+        // after validated input on adding or editing a record
+        function save()
+        {
+            if (entities.thing == null) // new record
+            {
+                var element = new Thing(entities.name.val(), entities.type.val());
+                db.Add(element);
+                db.Save();
+                addRow(element);
+            }
+            else
+            {
+                var element = entities.thing;
+                element.Name(entities.name.val());
+                element.Type(entities.type.val());
+                db.Edit(element);
+                db.Save();
+                updateRow(element.id);
+            }
+            entities.modal.modal('hide');
+        }
+
+        function requestNew()
+        {
+            entities.thing = null; // empty buffer
+            showInput();
+        }
+
+
+        function requestEdition(id)
+        {
+            entities.thing = Thing.Cast(db.GetByID(id)); 
+            showInput();
+        }
+
+        function requestRemoval(id)
+        {
+            entities.thing = Thing.Cast(db.GetByID(id));
+            entities.prompt.modal('show');   
+        }
+
+        function finishRemoval()
+        {
+            removeRow(entities.thing.id);
+            db.Delete(entities.thing);
+            db.Save();
+            entities.prompt.modal('hide');   
+        }
+        </script>
+    </head>
+<body>
+<header>
+	<div class="row">
+		<div class="col-sm-6">
+			<h2>CRUD of Things</h2>
+		</div>
+		<div class="col-sm-6 text-right h2">
+	    	<button onclick="requestNew()" class="btn btn-primary"><i class="fa fa-plus"></i> New thing</button>
+	    </div>
+	</div>
+</header>
+
+<table class="table table-hover" id="data">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Name</th>
+      <th>Type</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+
+<!-- Modal -->
+<div class="modal fade" id="input" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <form data-toggle="validator" role="form">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <h4 class="modal-title" id="myModalLabel">Add thing</h4>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+            <div class="form-group col-md-6">
+            <label for="field1">Name</label>
+            <input type="text" class="form-control" required="required" id="inputName">
+            </div>
+            <div class="form-group col-md-6">
+                <label for="field2">Type</label>
+                <input type="text" class="form-control" required="required" id="inputType">
+            </div>
+        </div>
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Dismiss</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+  </form>
+</div>
+
+<div class="modal fade" id="prompt">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Are you sure about this?</h4>
+                You will not be able to recover this data in the future.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+                <button type="button" class="btn btn-primary" onclick="finishRemoval()">Yes</button>
+            </div>
+        </div>
+    </div
+</div>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+body {
+    padding: 20px;
+}
+.tight
+{
+    display: flex;
+}
+.large
+{
+    width: 45%;   
+}
+button{
+    margin-left: 5px;
+}
